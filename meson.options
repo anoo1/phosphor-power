@@ -49,6 +49,10 @@ option(
     description: 'Enable support for cold redundancy'
 )
 option(
+    'ibm-ups', type: 'boolean',
+    description: 'Enable support for IBM UPS monitoring'
+)
+option(
     'supply-monitor', type: 'boolean',
     description: 'Enable support for power supply monitoring'
 )

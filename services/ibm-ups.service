@@ -1,0 +1,11 @@
+[Unit]
+Description=IBM UPS monitor
+Wants=obmc-mapper.target
+After=obmc-mapper.target
+
+[Service]
+Restart=on-failure
+ExecStart=/usr/bin/ibm-ups
+
+[Install]
+WantedBy=multi-user.target
