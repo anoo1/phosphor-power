@@ -47,6 +47,26 @@ class Monitor
      */
     explicit Monitor(sdbusplus::bus::bus& bus, const sdeventplus::Event& event);
 
+    /**
+     * Disables monitoring of the UPS device.
+     *
+     * The device will not be polled to obtain the current status.
+     */
+    void disable()
+    {
+        isEnabled = false;
+    }
+
+    /**
+     * Enables monitoring of the UPS device.
+     *
+     * The device will be polled to obtain the current status.
+     */
+    void enable()
+    {
+        isEnabled = true;
+    }
+
   private:
     /**
      * D-Bus bus object.
@@ -62,6 +82,14 @@ class Monitor
      * UPS device.
      */
     UPS ups;
+
+    /**
+     * Indicates whether monitoring is enabled.
+     *
+     * When monitoring is enabled, the UPS device will be polled to obtain the
+     * current status.
+     */
+    bool isEnabled{true};
 };
 
 } // namespace phosphor::power::ibm_ups

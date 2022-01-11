@@ -16,18 +16,51 @@
 
 #include "monitor.hpp"
 
+#include <CLI/CLI.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdeventplus/event.hpp>
 
-int main(void)
+#include <exception>
+#include <iostream>
+
+using namespace phosphor::power::ibm_ups;
+
+int main(int argc, const char* argv[])
 {
-    using namespace phosphor::power::ibm_ups;
+    int rc{0};
+    try
+    {
+        // Parse command line parameters (if any)
+        CLI::App app{"IBM UPS Monitor"};
+        bool isPollingDisabled{false};
+        app.add_flag("--no-poll", isPollingDisabled,
+                     "Do not poll the UPS device for status");
+        CLI11_PARSE(app, argc, argv);
 
-    auto bus = sdbusplus::bus::new_default();
-    auto event = sdeventplus::Event::get_default();
-    bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
+        // Create D-Bus bus and event
+        auto bus = sdbusplus::bus::new_default();
+        auto event = sdeventplus::Event::get_default();
+        bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
 
-    Monitor monitor{bus, event};
+        // Create UPS monitor
+        Monitor monitor{bus, event};
+        if (isPollingDisabled)
+        {
+            // Disable monitoring/polling of the UPS device
+            monitor.disable();
+        }
 
-    return event.loop();
+        rc = event.loop();
+    }
+    catch (const std::exception& e)
+    {
+        rc = 1;
+        std::cerr << e.what() << std::endl;
+    }
+    catch (...)
+    {
+        rc = 1;
+        std::cerr << "Unknown exception occurred." << std::endl;
+    }
+    return rc;
 }
