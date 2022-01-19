@@ -16,6 +16,8 @@
 
 #include "monitor.hpp"
 
+#include <functional>
+
 namespace phosphor::power::ibm_ups
 {
 
@@ -25,10 +27,14 @@ namespace phosphor::power::ibm_ups
 constexpr auto serviceName = "xyz.openbmc_project.Power.IBMUPS";
 
 Monitor::Monitor(sdbusplus::bus::bus& bus, const sdeventplus::Event& event) :
-    bus{bus}, eventLoop{event}, ups{bus}
+    bus{bus}, eventLoop{event}, ups{bus},
+    timer{event, std::bind(&Monitor::timerExpired, this)}
 {
     // Obtain D-Bus service name
     bus.request_name(serviceName);
+
+    // Start timer that polls UPS device for current status
+    startTimer();
 }
 
 } // namespace phosphor::power::ibm_ups

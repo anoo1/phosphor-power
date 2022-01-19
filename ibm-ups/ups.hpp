@@ -20,6 +20,7 @@
 #include <sdbusplus/bus.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -56,7 +57,6 @@ class UPS : public DeviceObject
     UPS(UPS&&) = delete;
     UPS& operator=(const UPS&) = delete;
     UPS& operator=(UPS&&) = delete;
-    virtual ~UPS() = default;
 
     /**
      * Constructor.
@@ -66,12 +66,16 @@ class UPS : public DeviceObject
     explicit UPS(sdbusplus::bus::bus& bus);
 
     /**
+     * Destructor.
+     *
+     * Closes the UPS device if necessary.
+     */
+    virtual ~UPS();
+
+    /**
      * Refreshes the UPS device status by reading from the UPS cable.
      */
-    virtual void refresh() override
-    {
-        // Not implemented yet
-    }
+    virtual void refresh() override;
 
     /**
      * Gets history for the UPS device that is persistent across reboots.
@@ -97,6 +101,109 @@ class UPS : public DeviceObject
     {
         return std::vector<std::tuple<double, double>>{};
     }
+
+  private:
+    /**
+     * Close the UPS device.
+     */
+    void closeDevice();
+
+    /**
+     * Find the file system path to the UPS device.
+     *
+     * If found, the path is stored in the devicePath data member.
+     *
+     * @return true if file system path was found, false otherwise
+     */
+    bool findDevicePath();
+
+    /**
+     * Handle a failed attempt to read current status from the UPS device.
+     */
+    void handleReadDeviceFailure();
+
+    /**
+     * Handle a successful attempt to read current status from the UPS device.
+     *
+     * @param modemBits modem bit values read from the device
+     */
+    void handleReadDeviceSuccess(int modemBits);
+
+    /**
+     * Set D-Bus properties to initial values indicating the UPS is not present.
+     */
+    void initializeDBusProperties();
+
+    /**
+     * Returns whether the UPS device has been opened.
+     *
+     * @return true if device is open, false otherwise
+     */
+    bool isDeviceOpen()
+    {
+        return (fd != INVALID_FD);
+    }
+
+    /**
+     * Open the UPS device.
+     *
+     * @return true if device was opened, false otherwise
+     */
+    bool openDevice();
+
+    /**
+     * Read current status from the UPS device.
+     */
+    void readDevice();
+
+    /**
+     * Update D-Bus properties with the current status read from the UPS device.
+     *
+     * @param isOn specifies whether the UPS device is present/functional
+     * @param isBatteryLow specifies whether the UPS battery level is low
+     * @param isUtilityFail specifies whether the UPS is providing power
+     *                      to the system due to a utility failure
+     */
+    void updateDBusProperties(bool isOn, bool isBatteryLow, bool isUtilityFail);
+
+    /**
+     * Invalid value for a file descriptor.
+     */
+    static constexpr int INVALID_FD{-1};
+
+    /**
+     * Invalid value for the modem bits read from the UPS device.
+     */
+    static constexpr int INVALID_MODEM_BITS{-1};
+
+    /**
+     * File system path to the UPS device.
+     */
+    std::filesystem::path devicePath{};
+
+    /**
+     * File descriptor for the UPS device.
+     */
+    int fd{INVALID_FD};
+
+    /**
+     * Number of consecutive device reads that have failed with an error.
+     */
+    unsigned short readErrorCount{0};
+
+    /**
+     * Number of consecutive device reads that have returned the same modem bit
+     * values.
+     *
+     * This provides de-glitching to ignore a transient event where invalid data
+     * is read.
+     */
+    unsigned short matchingReadCount{0};
+
+    /**
+     * Modem bits previously read from the UPS device.
+     */
+    int prevModemBits{INVALID_MODEM_BITS};
 };
 
 } // namespace phosphor::power::ibm_ups
