@@ -131,8 +131,11 @@ class UPS : public DeviceObject
 
     /**
      * Set D-Bus properties to initial values indicating the UPS is not present.
+     *
+     * @param skipSignals indicates whether to skip emitting D-Bus property
+     *                    changed signals
      */
-    void initializeDBusProperties();
+    void initializeDBusProperties(bool skipSignals = false);
 
     /**
      * Returns whether the UPS device has been opened.
@@ -175,6 +178,11 @@ class UPS : public DeviceObject
      * Invalid value for the modem bits read from the UPS device.
      */
     static constexpr int INVALID_MODEM_BITS{-1};
+
+    /**
+     * D-Bus bus object.
+     */
+    sdbusplus::bus::bus& bus;
 
     /**
      * File system path to the UPS device.

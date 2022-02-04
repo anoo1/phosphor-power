@@ -22,17 +22,14 @@ namespace phosphor::power::ibm_ups
 {
 
 /**
- * D-Bus service/bus name for this application.
+ * Root D-Bus object path for this application.
  */
-constexpr auto serviceName = "xyz.openbmc_project.Power.IBMUPS";
+constexpr auto rootObjectPath = "/org/freedesktop/UPower";
 
 Monitor::Monitor(sdbusplus::bus::bus& bus, const sdeventplus::Event& event) :
-    bus{bus}, eventLoop{event}, ups{bus},
+    bus{bus}, eventLoop{event}, manager{bus, rootObjectPath}, ups{bus},
     timer{event, std::bind(&Monitor::timerExpired, this)}
 {
-    // Obtain D-Bus service name
-    bus.request_name(serviceName);
-
     // Start timer that polls UPS device for current status
     startTimer();
 }

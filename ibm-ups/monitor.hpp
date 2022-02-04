@@ -18,6 +18,7 @@
 #include "ups.hpp"
 
 #include <sdbusplus/bus.hpp>
+#include <sdbusplus/server/manager.hpp>
 #include <sdeventplus/event.hpp>
 #include <sdeventplus/utility/timer.hpp>
 
@@ -115,6 +116,14 @@ class Monitor
      * Event object to loop on.
      */
     const sdeventplus::Event& eventLoop;
+
+    /**
+     * D-Bus object manager.
+     *
+     * Causes this application to implement the
+     * org.freedesktop.DBus.ObjectManager interface.
+     */
+    sdbusplus::server::manager_t manager;
 
     /**
      * UPS device.

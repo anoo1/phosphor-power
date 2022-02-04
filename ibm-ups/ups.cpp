@@ -60,10 +60,16 @@ constexpr unsigned short maxReadErrorCount{3};
  */
 constexpr unsigned short requiredMatchingReadCount{3};
 
-UPS::UPS(sdbusplus::bus::bus& bus) : DeviceObject{bus, objectPath}
+UPS::UPS(sdbusplus::bus::bus& bus) :
+    DeviceObject{bus, objectPath, true}, bus{bus}
 {
-    // Set D-Bus properties to initial values indicating the UPS is not present
-    initializeDBusProperties();
+    // Set D-Bus properties to initial values indicating the UPS is not present.
+    // Skip emitting D-Bus signals until the object has been fully created.
+    bool skipSignals{true};
+    initializeDBusProperties(skipSignals);
+
+    // Now emit D-Bus signal that object has been created
+    emit_object_added();
 }
 
 UPS::~UPS()
@@ -202,14 +208,14 @@ void UPS::handleReadDeviceSuccess(int modemBits)
     prevModemBits = modemBits;
 }
 
-void UPS::initializeDBusProperties()
+void UPS::initializeDBusProperties(bool skipSignals)
 {
-    type(device::type::Ups);
-    powerSupply(true);
-    isPresent(false);
-    state(device::state::FullyCharged);
-    isRechargeable(true);
-    batteryLevel(device::battery_level::Full);
+    type(device::type::Ups, skipSignals);
+    powerSupply(true, skipSignals);
+    isPresent(false, skipSignals);
+    state(device::state::FullyCharged, skipSignals);
+    isRechargeable(true, skipSignals);
+    batteryLevel(device::battery_level::Full, skipSignals);
 }
 
 bool UPS::openDevice()
