@@ -16,6 +16,9 @@
 
 #include "ups.hpp"
 
+#include "error_logging.hpp"
+#include "journal.hpp"
+
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -116,11 +119,13 @@ void UPS::closeDevice()
     close(fd);
     fd = INVALID_FD;
 
-    // Clear data members used to open and read the device
+    // Clear other data members related to the UPS device
     devicePath.clear();
     readErrorCount = 0;
     matchingReadCount = 0;
     prevModemBits = INVALID_MODEM_BITS;
+    hasLoggedBatteryDischarging = false;
+    hasLoggedBatteryLow = false;
 
     // Set D-Bus properties to initial values indicating the UPS is not present
     initializeDBusProperties();
@@ -198,6 +203,9 @@ void UPS::handleReadDeviceSuccess(int modemBits)
             bool isOn = static_cast<bool>(modemBits & TIOCM_CAR);
             bool isBatteryLow = static_cast<bool>(modemBits & TIOCM_CTS);
             bool isUtilityFail = static_cast<bool>(modemBits & TIOCM_DSR);
+
+            // Log errors or clear error history based on UPS status
+            updateErrorStatus(isBatteryLow, isUtilityFail);
 
             // Update D-Bus properties with current UPS status
             updateDBusProperties(isOn, isBatteryLow, isUtilityFail);
@@ -279,6 +287,46 @@ void UPS::updateDBusProperties(bool isOn, bool isBatteryLow, bool isUtilityFail)
     // Set D-Bus BatteryLevel property
     batteryLevel(isBatteryLow ? device::battery_level::Low
                               : device::battery_level::Full);
+}
+
+void UPS::updateErrorStatus(bool isBatteryLow, bool isUtilityFail)
+{
+    // Check if utility failure is occurring, causing UPS battery to discharge
+    if (isUtilityFail)
+    {
+        // Log error if one was not already logged
+        if (!hasLoggedBatteryDischarging)
+        {
+            journal::logError(
+                "UPS battery discharging due to utility failure: " +
+                devicePath.native());
+            error_logging::logBatteryDischarging(bus, devicePath.native());
+            hasLoggedBatteryDischarging = true;
+        }
+    }
+    else
+    {
+        // Clear error history since battery is no longer discharging
+        hasLoggedBatteryDischarging = false;
+    }
+
+    // Check if the UPS battery level is low
+    if (isBatteryLow)
+    {
+        // Log error if one was not already logged
+        if (!hasLoggedBatteryLow)
+        {
+            journal::logError("UPS battery level is low: " +
+                              devicePath.native());
+            error_logging::logBatteryLow(bus, devicePath.native());
+            hasLoggedBatteryLow = true;
+        }
+    }
+    else
+    {
+        // Clear error history since battery level is no longer low
+        hasLoggedBatteryLow = false;
+    }
 }
 
 } // namespace phosphor::power::ibm_ups

@@ -1,5 +1,6 @@
 ibm_ups = executable(
     'ibm-ups',
+    'error_logging.cpp',
     'main.cpp',
     'monitor.cpp',
     'ups.cpp',

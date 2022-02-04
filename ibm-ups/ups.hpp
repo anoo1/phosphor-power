@@ -170,6 +170,17 @@ class UPS : public DeviceObject
     void updateDBusProperties(bool isOn, bool isBatteryLow, bool isUtilityFail);
 
     /**
+     * Update the error status of the UPS device.
+     *
+     * Log errors or clear error history based on the current UPS status.
+     *
+     * @param isBatteryLow specifies whether the UPS battery level is low
+     * @param isUtilityFail specifies whether the UPS is providing power
+     *                      to the system due to a utility failure
+     */
+    void updateErrorStatus(bool isBatteryLow, bool isUtilityFail);
+
+    /**
      * Invalid value for a file descriptor.
      */
     static constexpr int INVALID_FD{-1};
@@ -212,6 +223,18 @@ class UPS : public DeviceObject
      * Modem bits previously read from the UPS device.
      */
     int prevModemBits{INVALID_MODEM_BITS};
+
+    /**
+     * Indicates whether an error has been logged because the UPS battery
+     * is discharging due to a utility failure.
+     */
+    bool hasLoggedBatteryDischarging{false};
+
+    /**
+     * Indicates whether an error has been logged because the UPS battery
+     * level is low.
+     */
+    bool hasLoggedBatteryLow{false};
 };
 
 } // namespace phosphor::power::ibm_ups
