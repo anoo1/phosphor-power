@@ -1,11 +1,14 @@
 [Unit]
 Description=IBM UPS monitor
+Before=xyz.openbmc_project.State.Chassis.service
 Wants=obmc-mapper.target
 After=obmc-mapper.target
 
 [Service]
 Restart=on-failure
 ExecStart=/usr/bin/ibm-ups
+Type=dbus
+BusName=xyz.openbmc_project.Power.IBMUPS
 
 [Install]
 WantedBy=multi-user.target

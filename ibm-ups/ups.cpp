@@ -23,6 +23,9 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include <chrono>
+#include <thread>
+
 namespace phosphor::power::ibm_ups
 {
 
@@ -71,8 +74,23 @@ UPS::UPS(sdbusplus::bus::bus& bus) :
     bool skipSignals{true};
     initializeDBusProperties(skipSignals);
 
-    // Now emit D-Bus signal that object has been created
+    // Read from cable sufficient number of times to determine actual UPS status
+    for (int i = 1; i <= (requiredMatchingReadCount + 1); ++i)
+    {
+        refresh();
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(50ms);
+    }
+
+    // Emit D-Bus signal that object has been created
     emit_object_added();
+
+    // Force PropertiesChanged events to be emitted for the three UPS status
+    // properties.  emit_object_added() will cause InterfacesAdded to be
+    // emitted, but some applications only listen for PropertiesChanged.
+    emitIsPresentChangedEvent();
+    emitStateChangedEvent();
+    emitBatteryLevelChangedEvent();
 }
 
 UPS::~UPS()
@@ -181,6 +199,9 @@ void UPS::handleReadDeviceSuccess(int modemBits)
 {
     // Clear consecutive read error count
     readErrorCount = 0;
+
+    // Mask off modem bits that we don't care about
+    modemBits &= (TIOCM_CAR | TIOCM_CTS | TIOCM_DSR);
 
     // Check if modem bits have changed since the previous read
     if (modemBits != prevModemBits)

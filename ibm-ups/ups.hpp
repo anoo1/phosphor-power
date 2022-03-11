@@ -109,6 +109,49 @@ class UPS : public DeviceObject
     void closeDevice();
 
     /**
+     * Force a PropertiesChanged event to be emitted for the BatteryLevel
+     * property.
+     */
+    void emitBatteryLevelChangedEvent()
+    {
+        // Save current value, change property without emitting a signal, and
+        // then change back to the saved value.  There is no direct way to force
+        // the signal to be emitted using the sdbusplus API.
+        bool skipSignal{true};
+        uint32_t value = batteryLevel();
+        batteryLevel(device::battery_level::Unknown, skipSignal);
+        batteryLevel(value);
+    }
+
+    /**
+     * Force a PropertiesChanged event to be emitted for the IsPresent property.
+     */
+    void emitIsPresentChangedEvent()
+    {
+        // Save current value, change property without emitting a signal, and
+        // then change back to the saved value.  There is no direct way to force
+        // the signal to be emitted using the sdbusplus API.
+        bool skipSignal{true};
+        bool value = isPresent();
+        isPresent(!value, skipSignal);
+        isPresent(value);
+    }
+
+    /**
+     * Force a PropertiesChanged event to be emitted for the State property.
+     */
+    void emitStateChangedEvent()
+    {
+        // Save current value, change property without emitting a signal, and
+        // then change back to the saved value.  There is no direct way to force
+        // the signal to be emitted using the sdbusplus API.
+        bool skipSignal{true};
+        uint32_t value = state();
+        state(device::state::Unknown, skipSignal);
+        state(value);
+    }
+
+    /**
      * Find the file system path to the UPS device.
      *
      * If found, the path is stored in the devicePath data member.

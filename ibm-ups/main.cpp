@@ -42,9 +42,6 @@ int main(int argc, const char* argv[])
         auto event = sdeventplus::Event::get_default();
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
 
-        // Obtain D-Bus service name
-        bus.request_name("xyz.openbmc_project.Power.IBMUPS");
-
         // Create UPS monitor
         Monitor monitor{bus, event};
         if (isPollingDisabled)
@@ -52,6 +49,9 @@ int main(int argc, const char* argv[])
             // Disable monitoring/polling of the UPS device
             monitor.disable();
         }
+
+        // Obtain D-Bus service name
+        bus.request_name("xyz.openbmc_project.Power.IBMUPS");
 
         rc = event.loop();
     }
