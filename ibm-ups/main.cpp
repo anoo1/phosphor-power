@@ -19,6 +19,7 @@
 #include <CLI/CLI.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdeventplus/event.hpp>
+#include <stdplus/signal.hpp>
 
 #include <exception>
 #include <iostream>
@@ -30,6 +31,10 @@ int main(int argc, const char* argv[])
     int rc{0};
     try
     {
+        // Block SIGHUP and SIGCONT signals that may be sent by UPS driver
+        stdplus::signal::block(SIGHUP);
+        stdplus::signal::block(SIGCONT);
+
         // Parse command line parameters (if any)
         CLI::App app{"IBM UPS Monitor"};
         bool isPollingDisabled{false};

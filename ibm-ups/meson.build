@@ -8,7 +8,8 @@ ibm_ups = executable(
         phosphor_dbus_interfaces,
         phosphor_logging,
         sdbusplus,
-        sdeventplus
+        sdeventplus,
+        stdplus
     ],
     install: true
 )
