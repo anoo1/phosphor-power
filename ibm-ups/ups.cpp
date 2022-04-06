@@ -67,7 +67,7 @@ constexpr unsigned short maxReadErrorCount{3};
 constexpr unsigned short requiredMatchingReadCount{3};
 
 UPS::UPS(sdbusplus::bus::bus& bus) :
-    DeviceObject{bus, objectPath, true}, bus{bus}
+    DeviceObject{bus, objectPath, DeviceObject::action::defer_emit}, bus{bus}
 {
     // Set D-Bus properties to initial values indicating the UPS is not present.
     // Skip emitting D-Bus signals until the object has been fully created.
