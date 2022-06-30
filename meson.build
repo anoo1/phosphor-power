@@ -91,6 +91,7 @@ services = [
     ['regulators', 'phosphor-regulators-config.service'],
     ['regulators', 'phosphor-regulators-monitor-enable.service'],
     ['regulators', 'phosphor-regulators-monitor-disable.service'],
+    ['regulators', 'reset_voltage_regulators.service'],
     ['power-control', 'phosphor-power-control.service'],
 ]
 
@@ -170,6 +171,10 @@ if get_option('ibm-ups')
 endif
 if get_option('regulators')
     subdir('phosphor-regulators')
+    install_data('reset_voltage_regulators',
+            install_mode: 'rwxr-xr-x',
+            install_dir: get_option('bindir')
+    )
 endif
 if get_option('sequencer-monitor')
     subdir('power-sequencer')
