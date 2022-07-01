@@ -1,5 +1,231 @@
 #!/usr/bin/python3
-
+#
+# Script to reset faults in all VRMs.
+#
 import sys
+import subprocess
+from collections import namedtuple
+
+DEBUG = 0
+
+BC_REG = 0x35
+BC_VALUE = 0xA5
+
+VRM_TUPLE = namedtuple('VRM', 'loc, i2cBus, controllers_s, controllers_m, phases')
+
+# All I2C Addresses are 7-Bit!
+vrms = {
+    # CP3 - Bus 9
+    "gcp3": VRM_TUPLE("C54",  9, (0x1A, 0x1B), None, (0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77)),
+    "ncp31": VRM_TUPLE("C55",  9, (0x18,), None, (0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37)),
+    "ncp30": VRM_TUPLE("C57",  9, (0x19,), None, (0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F)),
+    "m1": VRM_TUPLE("C58",  9, (0x1C, 0x1D), None, (0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67)),
+
+    # CP1 - Bus 10
+    "gcp1": VRM_TUPLE("C12", 10, (0x1A, 0x1B), None, (0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77)),
+    "ncp10": VRM_TUPLE("C13", 10, (0x19,), None, (0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F)),
+    "ncp11": VRM_TUPLE("C15", 10, (0x18,), None, (0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37)),
+    "m2": VRM_TUPLE("C16", 10, (0x1C, 0x1D), None, (0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67)),
+
+    # CP0 - Bus 11
+    # Clear Standby regs, 0x62 and 0x63 twice.  Don't clear 3.3Vcs Regs here
+    "r1": VRM_TUPLE("C59", 11, (0x1C,), (0x1D, 0x1E), (0x62, 0x63, 0x60, 0x61, 0x62, 0x63)),
+    "ncp01": VRM_TUPLE("C60", 11, (0x18,), None, (0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37)),
+    "ncp00": VRM_TUPLE("C62", 11, (0x19,), None, (0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F)),
+    "gcp0": VRM_TUPLE("C63", 11, (0x1A, 0x1B), None, (0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77)),
+
+    # CP2 - Bus 13
+    # Standby Regs 0x62 and 0x63 are cleared twice.
+    "r2": VRM_TUPLE("C17", 13, (0x1C,), (0x1D, 0x1E), (0x62, 0x63, 0x60, 0x61, 0x64, 0x65, 0x66, 0x62, 0x63)),
+    "ncp20": VRM_TUPLE("C18", 13, (0x19,), None, (0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F)),
+    "ncp21": VRM_TUPLE("C20", 13, (0x18,), None, (0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37)),
+    "gcp2": VRM_TUPLE("C21", 13, (0x1A, 0x1B), None, (0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77)),
+
+    # USB Front
+    "front_usb0": VRM_TUPLE("P1", 45, None, (0x40,), (0x14,)),
+    "front_usb1": VRM_TUPLE("P1", 46, None, (0x40,), (0x14,)),
+
+    # USB BMC
+    # Clear the phases twice.
+    "bmc_usb0": VRM_TUPLE("C0", 47, None, (0x40,), (0x14, 0x14)),
+    "bmc_usb1": VRM_TUPLE("C0", 48, None, (0x40,), (0x14, 0x14)),
+}
+
+
+# Phases to store breadcrumbs.  ( i2cBus, Address)
+bc_phases = ((45, 0x14), (47, 0x14))
+
+
+def bmcCommand(command, maxAttempts=3):
+
+    if DEBUG >= 2:
+        print(f"Cmd> {command}")
+
+    if maxAttempts < 1:
+        maxAttempts = 1
+
+    for _ in range(maxAttempts):
+
+        result = subprocess.run(command, shell=True, text=True, capture_output=True)
+        outLines = ""
+        errLines = ""
+        if result.stdout:
+            outLines = result.stdout.strip()
+        if result.stderr:
+            errLines = result.stderr.strip()
+        if DEBUG >= 3:
+            print(f"rc = {result.returncode}")
+            print('--- outLines ---')
+            print(f"'{outLines.strip()}'")
+            print('--- errLines ---')
+            print(f"'{errLines.strip()}'")
+            print('--- done ---')
+
+        if result.returncode == 0:
+            return 0, outLines, errLines
+
+        else: 
+            # Retry Command
+            if DEBUG >= 1:
+                print(f"Command Error!")
+                print(f"rc = {result.returncode}")
+                print(f"Command: '{command}' Returns:")
+                print(f"{errLines}")
+                print(f"Retrying command...")
+
+    return result.returncode, outLines, errLines
+
+
+def readReg(i2cBus, address, reg, numBytes):
+    cmd = f"/usr/sbin/i2ctransfer -y -f {i2cBus} w1@{hex(address)} {reg} r{numBytes}"
+    (rc, output, errors) = bmcCommand(cmd)
+    return rc, output
+
+
+def clearPhaseFaults(i2cBus, address):
+    cmd = f"/usr/sbin/i2ctransfer -y -f {i2cBus} w3@{hex(address)} 0x90 0xFF 0xFF"
+    (rc, output, errors) = bmcCommand(cmd)
+    return
+
+
+def clearControllerSFaults(i2cBus, address):
+    # Clear Both Pages, use 0xFF
+    cmd = f"/usr/sbin/i2ctransfer -y -f {i2cBus} w2@{hex(address)} 0x00 0xFF"
+    (rc, output, errors) = bmcCommand(cmd)
+    cmd = f"/usr/sbin/i2ctransfer -y -f {i2cBus} w1@{hex(address)} 0x03"
+    (rc, output, errors) = bmcCommand(cmd)
+    cmd = f"/usr/sbin/i2ctransfer -y -f {i2cBus} w2@{hex(address)} 0x00 0x00"
+    (rc, output, errors) = bmcCommand(cmd)
+    return
+
+
+def clearControllerMFaults(i2cBus, address):
+    cmd = f"/usr/sbin/i2ctransfer -y -f {i2cBus} w1@{hex(address)} 0x03"
+    (rc, output, errors) = bmcCommand(cmd)
+    return
+
+
+def clear3V3VcsFaults():
+    cmd = f"/usr/sbin/i2ctransfer -y -f 11 w2@0x1C 0x00 0x01"
+    (rc, output, errors) = bmcCommand(cmd)
+    cmd = f"/usr/sbin/i2ctransfer -y -f 11 w6@0x1C 0xD0 0x04 0x80 0x08 0x02 0x00"
+    (rc, output, errors) = bmcCommand(cmd)
+    clearPhaseFaults(11, 0x64)
+    clearPhaseFaults(11, 0x65)
+    clearPhaseFaults(11, 0x66)
+    clearPhaseFaults(11, 0x64)
+    clearPhaseFaults(11, 0x65)
+    clearPhaseFaults(11, 0x66)
+    cmd = f"/usr/sbin/i2ctransfer -y -f 11 w6@0x1C 0xD0 0x04 0x80 0x08 0x00 0x00"
+    (rc, output, errors) = bmcCommand(cmd)
+    clearControllerSFaults(11, 0x1C)
+
+
+# Return True if a breadcrumb is set
+def checkBreadCrumbs():
+    if DEBUG >= 1:
+        print("Checking for Breadcrumbs..")
+    for bc in bc_phases:
+        (rc, value) = readReg(bc[0], bc[1], BC_REG, 1)
+        if value == hex(BC_VALUE):
+            return True
+    return False
+    
+
+def storeBreadCrumbs():
+    if DEBUG >= 1:
+        print("Storing Breadcrumbs..")
+    for bc in bc_phases:
+        cmd = f"/usr/sbin/i2ctransfer -y -f {bc[0]} w2@{hex(bc[1])} {BC_REG} {BC_VALUE}"
+        if DEBUG >= 2:
+            print(f"> CMD> {cmd}")
+        (rc, output, errors) = bmcCommand(cmd)
+
+
+# Return True if the system is Everest
+def isEverest():
+    f = open("/sys/firmware/devicetree/base/model", "r")
+    system = f.read(7)
+    f.close()
+    if DEBUG >= 1:
+        print(f"System Type is: '{system}'")
+    if system == "Everest":
+        return True
+    return False
+
+
+# Return True if the system is powered ON
+def isPowerOn():
+    cmd = "busctl get-property org.openbmc.control.Power /org/openbmc/control/power0 org.openbmc.control.Power pgood"
+    (rc, output, errors) = bmcCommand(cmd)
+    if DEBUG >= 1:
+        print(f"System Power State: '{output}'")
+    if output == "i 0":
+        return False
+    return True
+
+
+# ------------------
+# main()
+# ------------------
+
+# Only run for Everest
+if not isEverest():
+    sys.exit(0)
+
+# Check power state
+if isPowerOn():
+    sys.exit(0)
+
+# Check if script has been run already.
+if checkBreadCrumbs():
+    sys.exit(0)
+
+# Reset all VRM faults
+for vrm in vrms:
+    if DEBUG >= 1:
+        print(f"---------------VRM: {vrm} Bus: {vrms[vrm].i2cBus} ------------")
+   
+    if vrms[vrm].phases is not None:
+        for phase in vrms[vrm].phases:
+            clearPhaseFaults(vrms[vrm].i2cBus, phase)
+            if DEBUG >= 1:
+                print(f"Clearing {vrm}: Phase {hex(phase)}")
+
+    if vrms[vrm].controllers_s is not None:
+        for sb in vrms[vrm].controllers_s:
+            clearControllerSFaults(vrms[vrm].i2cBus, sb)
+            if DEBUG >= 1:
+                print(f"Clearing {vrm}: Controller S {hex(sb)}")
+
+    if vrms[vrm].controllers_m is not None:
+        for mb in vrms[vrm].controllers_m:
+            clearControllerMFaults(vrms[vrm].i2cBus, mb)
+            if DEBUG >= 1:
+                print(f"Clearing {vrm}: Controller M {hex(mb)}")
+
+clear3V3VcsFaults()
+
+storeBreadCrumbs()
 
 sys.exit(0)
