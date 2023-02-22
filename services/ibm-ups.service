@@ -1,8 +1,6 @@
 [Unit]
 Description=IBM UPS monitor
 Before=xyz.openbmc_project.State.Chassis.service
-Wants=obmc-mapper.target
-After=obmc-mapper.target
 
 [Service]
 Restart=on-failure
