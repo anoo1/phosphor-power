@@ -1,6 +1,6 @@
 [Unit]
 Description=IBM UPS monitor
-Before=xyz.openbmc_project.State.Chassis.service
+Before=xyz.openbmc_project.State.Chassis@0.service
 
 [Service]
 Restart=on-failure
